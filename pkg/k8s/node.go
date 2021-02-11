@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 
 	"github.com/cilium/cilium/pkg/annotation"
 	"github.com/cilium/cilium/pkg/cidr"
@@ -214,6 +215,16 @@ func ParseNode(k8sNode *slim_corev1.Node, source source.Source) *nodeTypes.Node 
 func GetNode(c kubernetes.Interface, nodeName string) (*corev1.Node, error) {
 	// Try to retrieve node's cidr and addresses from k8s's configuration
 	return c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+}
+
+// IsProviderKind returns true if the given node with nodeName is running in
+// a Kind cluster.
+func IsProviderKind(c kubernetes.Interface, nodeName string) (bool, error) {
+	node, err := GetNode(c, nodeName)
+	if err != nil {
+		return false, err
+	}
+	return strings.HasPrefix(node.Spec.ProviderID, "kind://"), nil
 }
 
 // setNodeNetworkUnavailableFalse sets Kubernetes NodeNetworkUnavailable to

@@ -27,6 +27,7 @@ import (
 	health "github.com/cilium/cilium/cilium-health/launch"
 	"github.com/cilium/cilium/pkg/bandwidth"
 	"github.com/cilium/cilium/pkg/bpf"
+	"github.com/cilium/cilium/pkg/cgroups"
 	"github.com/cilium/cilium/pkg/clustermesh"
 	"github.com/cilium/cilium/pkg/controller"
 	"github.com/cilium/cilium/pkg/counter"
@@ -509,6 +510,20 @@ func NewDaemon(ctx context.Context, epMgr *endpointmanager.EndpointManager, dp d
 	// which can be modified after the device detection.
 	handleNativeDevices(isKubeProxyReplacementStrict)
 	finishKubeProxyReplacementInit(isKubeProxyReplacementStrict)
+
+	// Cgroup v2 hierarchy root used for attachment is different when running on Kind.
+	runsOnKind := false
+	if option.Config.EnableHostReachableServices {
+		isKind, err := k8s.IsProviderKind(k8s.Client(), nodeTypes.GetName())
+		if err == nil {
+			runsOnKind = isKind
+		} else {
+			log.WithError(err).
+				Warnf("Failed to retrieve k8s node provider. If running on Kind, socket-based LB (--%s) will not work.",
+					option.EnableHostReachableServices)
+		}
+	}
+	cgroups.CheckOrMountCgrpFS(option.Config.CGroupRoot, runsOnKind)
 
 	// Launch the K8s watchers in parallel as we continue to process other
 	// daemon options.
